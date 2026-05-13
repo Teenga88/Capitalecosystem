@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Capital Flow OS — Internal Treasury</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Noto+Sans+Thai:wght@300;400;600;700&display=swap');
+
+:root {
+  --bg: #05070f;
+  --surface: #0c0f1e;
+  --panel: #0f1221;
+  --border: rgba(255,255,255,.08);
+  --border-hi: rgba(255,255,255,.18);
+  --text: #e8eeff;
+  --muted: rgba(232,238,255,.42);
+  --dim: rgba(232,238,255,.24);
+  --cf: #f7b731;
+  --beta: #00e5b4;
+  --alpha: #ff4268;
+  --ef: #8b78ff;
+  --engine: #36d9c8;
+  --custom: #78b8ff;
+  --danger: #ff3d5e;
+  --gold: #f7b731;
+  --r: 20px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Noto Sans Thai', sans-serif; user-select: none; }
+
+#viewport {
+  position: fixed; inset: 0; overflow: hidden; cursor: grab;
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, rgba(120,184,255,.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: var(--gx,0px) var(--gy,0px);
+}
+#viewport::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(120,184,255,.04), transparent 70%);
+}
+#viewport.panning { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; will-change: transform; }
+#svg { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; z-index: 1; pointer-events: auto; }
+#nodes { position: absolute; left: 0; top: 0; z-index: 2; }
+
+.node {
+  position: absolute; width: 180px; min-height: 92px; padding: 14px 16px;
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255,255,255,.055) 0%, rgba(10,13,28,.96) 100%);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter: blur(20px);
+  transform: translate(-50%,-50%);
+  cursor: grab; color: var(--custom);
+  transition: filter .15s, box-shadow .18s, border-color .18s;
+  animation: floatBubble var(--floatDur, 5.8s) ease-in-out infinite;
+  will-change: transform;
+}
+.node:hover { filter: brightness(1.10); border-color: rgba(255,255,255,.16); }
+.node.selected {
+  border-color: currentColor;
+  box-shadow: 0 0 0 1px currentColor, 0 12px 48px rgba(0,0,0,.65), 0 0 40px color-mix(in srgb, currentColor 22%, transparent);
+}
+.node.dragging {
+  animation: none; filter: brightness(1.22); cursor: grabbing;
+  box-shadow: 0 24px 72px rgba(0,0,0,.65), 0 0 36px color-mix(in srgb, currentColor 28%, transparent);
+}
+.node.jiggle { animation: bubbleJiggle .32s ease-out 1 !important; }
+
+@keyframes floatBubble {
+  0%, 100% { margin-top: 0; margin-left: 0; }
+  50% { margin-top: -6px; margin-left: 2px; }
+}
+@keyframes bubbleJiggle {
+  0% { scale: 1; } 35% { scale: 1.045; } 70% { scale: .988; } 100% { scale: 1; }
+}
+
+.node.cf {
+  width: 170px; min-height: 170px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: var(--cf);
+  background: radial-gradient(circle at 35% 30%, rgba(247,183,49,.22), rgba(247,183,49,.06) 55%, rgba(8,10,20,.97));
+  border-color: rgba(247,183,49,.22);
+  animation: floatCF 5.4s ease-in-out infinite;
+}
+.node.cf:hover { border-color: rgba(247,183,49,.45); }
+.node.beta { color: var(--beta); }
+.node.alpha { color: var(--alpha); }
+.node.ef { color: var(--ef); }
+.node.engine { color: var(--engine); }
+.node.custom { color: var(--custom); }
+@keyframes floatCF { 0%, 100% { margin-top: 0; } 50% { margin-top: -7px; } }
+
+.n-head { display: flex; gap: 9px; align-items: center; }
+.n-icon { width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.07); font-size: 13px; }
+.n-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; line-height: 1.2; color: currentColor; }
+.n-sub { font-family: 'DM Mono', monospace; font-size: 8.5px; color: var(--muted); margin-top: 2px; max-width: 128px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n-money { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: currentColor; margin-top: 9px; letter-spacing: .01em; }
+.n-stats { font-family: 'DM Mono', monospace; font-size: 8px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
+.cf .n-head { display: block; }
+.cf .n-title { font-size: 13px; }
+.cf .n-money { font-size: 17px; }
+.cf .n-sub { max-width: 140px; margin: 4px auto 0; }
+
+.port { position: absolute; width: 13px; height: 13px; border-radius: 5px; background: #a0a8c0; border: 2px solid #0e1120; box-shadow: 0 0 0 2px rgba(255,255,255,.06); z-index: 30; cursor: crosshair; transition: .12s; }
+.port:hover, .port.hot { background: #fff; box-shadow: 0 0 0 5px rgba(255,255,255,.12), 0 0 14px currentColor; }
+.port.in { border-radius: 50%; background: #8898c0; }
+.port.out { background: #c0c8dc; }
+.port.left { left: -7px; top: 50%; transform: translateY(-50%); }
+.port.right { right: -7px; top: 50%; transform: translateY(-50%); }
+.port.top-in { left: 36%; top: -7px; }
+.port.top-out { left: 58%; top: -7px; }
+.port.bottom-in { left: 32%; bottom: -7px; }
+.port.bottom-out { left: 54%; bottom: -7px; }
+.cf .port.cf-in { left: 50%; top: -8px; transform: translateX(-50%); }
+.cf .port.cf-out { left: 50%; bottom: -8px; transform: translateX(-50%); }
+.port::after { position: absolute; font-family: 'DM Mono', monospace; font-size: 6.5px; color: var(--dim); white-space: nowrap; pointer-events: none; }
+.port.in::after { content: 'in'; }
+.port.out::after { content: 'out'; }
+.port.top-in::after, .port.top-out::after { top: -13px; left: 50%; transform: translateX(-50%); }
+.port.bottom-in::after, .port.bottom-out::after { bottom: -13px; left: 50%; transform: translateX(-50%); }
+.port.left::after { left: 16px; top: 0; }
+.port.right::after { right: 16px; top: 0; }
+.cf .port.cf-in::after { top: -13px; left: 50%; transform: translateX(-50%); }
+.cf .port.cf-out::after { bottom: -13px; left: 50%; transform: translateX(-50%); }
+
+.top { position: fixed; top: 0; left: 0; right: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 20px 12px; background: linear-gradient(180deg, rgba(5,7,15,.95) 60%, transparent); pointer-events: none; }
+.top-logo { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--text); }
+.top-logo span { color: var(--gold); }
+.top-tag { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: .06em; border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; }
+
+.hint { position: fixed; top: 54px; left: 18px; z-index: 40; font-family: 'DM Mono', monospace; font-size: 9px; line-height: 2; color: var(--dim); pointer-events: none; }
+
+.toolbar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 70; display: flex; gap: 6px; padding: 9px 12px; border-radius: 999px; background: rgba(12,15,30,.95); border: 1px solid var(--border-hi); backdrop-filter: blur(20px); box-shadow: 0 16px 56px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); }
+button { font-family: 'Noto Sans Thai', sans-serif; font-weight: 700; }
+.btn { border: 1px solid var(--border); border-radius: 999px; background: rgba(255,255,255,.06); color: var(--text); font-size: 11px; padding: 7px 13px; cursor: pointer; transition: all .14s; }
+.btn:hover { filter: brightness(1.25); transform: translateY(-1px); border-color: var(--border-hi); }
+.btn-beta { color: var(--beta); background: rgba(0,229,180,.08); border-color: rgba(0,229,180,.28); }
+.btn-alpha { color: var(--alpha); background: rgba(255,66,104,.08); border-color: rgba(255,66,104,.28); }
+.btn-ef { color: var(--ef); background: rgba(139,120,255,.08); border-color: rgba(139,120,255,.28); }
+.btn-engine { color: var(--engine); background: rgba(54,217,200,.07); border-color: rgba(54,217,200,.25); }
+.btn-danger { color: var(--danger); background: rgba(255,61,94,.07); border-color: rgba(255,61,94,.25); }
+
+.panel, .modal { position: fixed; z-index: 80; background: linear-gradient(160deg, rgba(18,22,44,.97), rgba(10,13,26,.98)); border: 1px solid var(--border-hi); border-radius: 22px; padding: 18px; backdrop-filter: blur(28px) saturate(1.3); box-shadow: 0 24px 80px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.08); display: none; }
+.panel.show, .modal.show { display: block; }
+.panel { right: 20px; top: 50%; transform: translateY(-50%); width: 290px; max-height: 86vh; overflow-y: auto; }
+.modal { width: 310px; }
+.panel::-webkit-scrollbar { width: 4px; }
+.panel::-webkit-scrollbar-track { background: transparent; }
+.panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 4px; }
+.panel h2, .modal h2 { margin: 0 0 14px; font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: rgba(232,238,255,.7); }
+label { display: block; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+input, select { width: 100%; margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255,255,255,.055); color: var(--text); font-family: 'DM Mono', monospace; font-size: 12px; outline: none; transition: border-color .15s, box-shadow .15s; }
+input:focus, select:focus { border-color: rgba(120,184,255,.55); box-shadow: 0 0 0 3px rgba(120,184,255,.08); }
+select option { background: #111420; color: #edf1ff; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.panel .btn, .modal .btn { width: 100%; border-radius: 12px; margin-top: 5px; padding: 10px; }
+.section { border-top: 1px solid var(--border); padding-top: 13px; margin-top: 13px; }
+.mini { font-family: 'DM Mono', monospace; font-size: 9px; line-height: 1.6; color: var(--dim); margin-top: 7px; }
+.edgeitem { border: 1px solid var(--border); background: rgba(255,255,255,.03); border-radius: 12px; padding: 9px; margin-top: 7px; font-family: 'DM Mono', monospace; font-size: 9.5px; color: rgba(232,238,255,.68); cursor: pointer; transition: border-color .12s; }
+.edgeitem:hover { border-color: rgba(255,255,255,.2); }
+.edgeitem button { float: right; border: 0; background: transparent; color: var(--danger); cursor: pointer; font-size: 11px; }
+.edge-details { font-family: 'DM Mono', monospace; font-size: 9.5px; line-height: 1.7; color: rgba(232,238,255,.68); background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+.edge-route { font-family: 'DM Mono', monospace; font-size: 9.5px; color: rgba(232,238,255,.65); margin-bottom: 12px; line-height: 1.5; }
+.pill { display: inline-block; border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; margin: 1px 2px 1px 0; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 8px; }
+
+.backdrop { position: fixed; inset: 0; z-index: 75; background: rgba(0,0,0,.22); display: none; }
+.backdrop.show { display: block; }
+
+#summary { position: fixed; right: 20px; bottom: 20px; z-index: 45; width: 230px; background: linear-gradient(160deg, rgba(14,18,36,.94), rgba(8,11,22,.97)); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,.45); font-family: 'DM Mono', monospace; }
+#summary.panel-open { opacity: 0; pointer-events: none; transition: opacity .15s; }
+
+.sum-title { font-family: 'Syne', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 11px; padding-bottom: 9px; border-bottom: 1px solid var(--border); }
+.sum-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.sum-row:last-child { margin-bottom: 0; }
+.sum-label { font-size: 8.5px; color: var(--dim); }
+.sum-val { font-size: 11px; font-weight: 500; color: var(--text); }
+.sum-val.gold { color: var(--gold); }
+.sum-val.green { color: var(--beta); }
+.sum-val.red { color: var(--alpha); }
+.sum-val.purple { color: var(--ef); }
+.sum-divider { border: none; border-top: 1px solid var(--border); margin: 9px 0; }
+.sum-meta { font-size: 8px; color: var(--dim); line-height: 1.7; }
+
+.edge-hit { pointer-events: stroke; cursor: pointer; }
+.edge-main { pointer-events: none; }
+.edge-label { pointer-events: auto; cursor: grab; }
+.edge-label.dragging { cursor: grabbing; }
+.edge-handle { pointer-events: auto; cursor: move; }
+</style>
+</head>
+<body>
+<div id="viewport"><div id="world"><svg id="svg"></svg><div id="nodes"></div></div></div>
+
+<div class="top">
+  <div class="top-logo">Capital<span>&nbsp;Flow</span></div>
+  <div class="top-tag">INTERNAL TREASURY OS</div>
+</div>
+
+<div class="hint">
+  drag bg = pan &nbsp;·&nbsp; scroll = zoom<br>
+  drag bubble = move &nbsp;·&nbsp; drag line = curve<br>
+  port out → port in = new line
+</div>
+
+<div id="summary"></div>
+
+<div id="panel" class="panel">
+  <h2 id="panelTitle">ASSET NODE</h2>
+  <label>ชื่อ</label><input id="nodeName" type="text">
+  <label>รายละเอียด</label><input id="nodeSub" type="text">
+  <label>เงินต้น / Balance</label><input id="nodeBase" type="number" step="0.01">
+  <label>กำไร / ขาดทุนรอบนี้</label>
+  <input id="nodeProfit" type="number" step="0.01" placeholder="เช่น 1000 หรือ -400">
+  <div id="profitPreview" class="edge-details" style="display:block"></div>
+  <button class="btn btn-beta" id="applyProfitBtn">✓ บันทึกรอบ + อัปเดต Balance</button>
+  <button class="btn" id="saveBtn">บันทึกชื่อ / รายละเอียด</button>
+  <button class="btn btn-danger" id="deleteBtn">ลบ Node นี้</button>
+  <div class="section">
+    <label>เส้นแบ่งกำไร</label>
+    <div id="edgeList"></div>
+    <div class="mini">เส้นดึงเฉพาะ "กำไรบวก" ตอนกดบันทึก · ขาดทุน = ไม่โอนออก</div>
+  </div>
+</div>
+
+<div id="backdrop" class="backdrop"></div>
+
+<div id="edgeModal" class="modal">
+  <h2 id="edgeTitle">ตั้งค่าเส้น</h2>
+  <div id="edgeRoute" class="edge-route"></div>
+  <div id="edgeDetails" class="edge-details" style="display:none"></div>
+  <div class="row">
+    <div><label>% โอน</label><input id="edgePct" type="number" min="0" max="100" step="0.01" placeholder="30"></div>
+    <div><label>FIX (บาท)</label><input id="edgeFixed" type="number" min="0" step="0.01" placeholder="0"></div>
+  </div>
+  <button class="btn btn-beta" id="saveEdgeBtn">✓ บันทึกเส้น</button>
+  <button class="btn btn-danger" id="deleteEdgeBtn">ลบเส้นนี้</button>
+  <button class="btn" id="cancelEdgeBtn">ปิด</button>
+  <div class="mini">FIX > 0 ใช้ FIX แทน % · ระบบ scale อัตโนมัติถ้ายอดเกิน</div>
+</div>
+
+<div class="toolbar">
+  <button class="btn btn-beta" data-add="beta">+ Beta</button>
+  <button class="btn btn-alpha" data-add="alpha">+ Alpha</button>
+  <button class="btn btn-ef" data-add="ef">+ EF</button>
+  <button class="btn btn-engine" data-add="engine">+ Engine</button>
+  <button class="btn" data-add="custom">+ Node</button>
+  <button class="btn" id="fitBtn">Fit</button>
+  <button class="btn btn-danger" id="resetBtn">Reset</button>
+</div>
+
+<script>
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const VP = $('viewport'), world = $('world'), nodesEl = $('nodes'), svg = $('svg');
+const colors = { cf:'#f7b731', beta:'#00e5b4', alpha:'#ff4268', ef:'#8b78ff', engine:'#36d9c8', custom:'#78b8ff' };
+const icons  = { cf:'💰', beta:'🛡️', alpha:'⚡', ef:'🧯', engine:'🧠', custom:'◌' };
+let nodes=[], edges=[], selected=null, selectedEdge=null, pendingEdge=null;
+let drag=null, pan=null, connecting=null, edgeDrag=null;
+let view = { x: innerWidth/2, y: innerHeight/2, scale: 1 };
+let metrics = { by:{}, edge:{}, cfIn:0, cfOut:0 };
+const money = n => '฿' + Math.round(Number(n)||0).toLocaleString('th-TH');
+const uid   = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const byId  = id => nodes.find(n => n.id === id);
+const edgeById = id => edges.find(e => e.id === id);
+function s2w(x,y){ return { x:(x-view.x)/view.scale, y:(y-view.y)/view.scale }; }
+function applyView(){ world.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.scale})`;VP.style.setProperty('--gx',(view.x%24)+'px');VP.style.setProperty('--gy',(view.y%24)+'px'); }
+const STORAGE_KEY = 'cfNetwork.cashflow.profitLedger.v2';
+const LEGACY = ['cfNetwork.cashflow.profitOnly.v1','cfNetworkV5'];
+function save(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify({nodes,edges,view,updatedAt:new Date().toISOString()})); }catch(err){ alert('⚠️ บันทึกไม่สำเร็จ: localStorage อาจเต็ม'); } }
+function load(){ try{ let raw=localStorage.getItem(STORAGE_KEY); if(!raw){ for(const k of LEGACY){ raw=localStorage.getItem(k); if(raw)break; } } if(!raw)return false; const data=JSON.parse(raw); nodes=data.nodes||[]; edges=(data.edges||[]).map(e=>{ if(e.mx==null&&e.cx!=null){e.mx=e.cx;e.my=e.cy;} if(e.mx==null){e.mx=null;e.my=null;} if(e.lastAmount==null)e.lastAmount=0; return e; }); view=data.view||view; nodesEl.innerHTML=''; applyView(); nodes.forEach(n=>createNodeEl(n)); recalc(false); return true; }catch(e){ console.warn(e); return false; } }
+function addNode(type,x,y,name,sub,base){ const p=(x==null)?s2w(innerWidth/2+(Math.random()-.5)*160,innerHeight/2+(Math.random()-.5)*120):{x,y}; const count=nodes.filter(n=>n.type===type).length+1; const n={id:uid('n'),type,x:p.x,y:p.y,name:name||((type==='custom'?'Node':type[0].toUpperCase()+type.slice(1))+' #'+count),sub:sub||'',base:Number(base)||0,float:4.6+Math.random()*2.6}; nodes.push(n); createNodeEl(n); recalc(); save(); openPanel(n.id); return n; }
+function createNodeEl(n){ let el=$('node-'+n.id); if(!el){ el=document.createElement('div'); el.id='node-'+n.id; nodesEl.appendChild(el); el.addEventListener('pointerdown',nodeDown); el.addEventListener('click',nodeClick); } renderNode(n); }
+function portsHtml(n){ if(n.type==='cf')return`<div class="port in cf-in" data-node="${n.id}" data-port="in" data-pos="top"></div><div class="port out cf-out" data-node="${n.id}" data-port="out" data-pos="bottom"></div>`; return`<div class="port in left" data-node="${n.id}" data-port="in" data-pos="left"></div><div class="port out right" data-node="${n.id}" data-port="out" data-pos="right"></div><div class="port in top-in" data-node="${n.id}" data-port="in" data-pos="top-in"></div><div class="port out top-out" data-node="${n.id}" data-port="out" data-pos="top-out"></div><div class="port in bottom-in" data-node="${n.id}" data-port="in" data-pos="bottom-in"></div><div class="port out bottom-out" data-node="${n.id}" data-port="out" data-pos="bottom-out"></div>`; }
+function renderNode(n){ const el=$('node-'+n.id); if(!el)return; const m=metrics.by[n.id]||{in:0,out:0,net:n.base||0}; el.className=`node ${n.type}${selected===n.id?' selected':''}${drag&&drag.id===n.id?' dragging':''}`; el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.setProperty('--floatDur',(n.float||5.5)+'s'); const body=n.type==='cf'?`<div><div class="n-head"><div class="n-icon">${icons.cf}</div><div class="n-title">${n.name}</div></div><div class="n-money">${money(m.net)}</div><div class="n-sub">in ${money(m.in)} · out ${money(m.out)}</div></div>`:`<div class="n-head"><div class="n-icon">${icons[n.type]||'◌'}</div><div><div class="n-title">${n.name}</div><div class="n-sub">${n.sub||'—'}</div></div></div><div class="n-money">${money(m.net)}</div><div class="n-stats">base ${money(n.base)} · +${money(m.in)} · −${money(m.out)}</div>`; el.innerHTML=body+portsHtml(n); }
+function recalc(doRender=true){ const incoming=Object.fromEntries(nodes.map(n=>[n.id,0])); const outgoing=Object.fromEntries(nodes.map(n=>[n.id,0])); const edgeAmt={}; for(const e of edges){ if(!byId(e.from)||!byId(e.to))continue; const amt=Math.max(0,Number(e.lastAmount)||0); edgeAmt[e.id]=amt; outgoing[e.from]=(outgoing[e.from]||0)+amt; incoming[e.to]=(incoming[e.to]||0)+amt; } metrics={by:{},edge:edgeAmt,cfIn:0,cfOut:0}; for(const n of nodes)metrics.by[n.id]={in:incoming[n.id]||0,out:outgoing[n.id]||0,net:Math.max(0,Number(n.base)||0)}; const cf=nodes.find(n=>n.type==='cf'); if(cf){metrics.cfIn=incoming[cf.id]||0;metrics.cfOut=outgoing[cf.id]||0;} if(doRender)renderAll(); }
+function renderAll(){ nodes.forEach(renderNode); draw(); updateSummary(); edgeList(); }
+function nodeSize(n){ const el=$('node-'+n.id); return{w:el?el.offsetWidth:(n.type==='cf'?170:180),h:el?el.offsetHeight:(n.type==='cf'?170:92)}; }
+function portPos(n,pos){ const s=nodeSize(n),w=s.w,h=s.h; if(n.type==='cf'){return pos==='bottom'?{x:n.x,y:n.y+h/2}:{x:n.x,y:n.y-h/2};} switch(pos){case'left':return{x:n.x-w/2,y:n.y};case'right':return{x:n.x+w/2,y:n.y};case'top-in':return{x:n.x-w/2+w*.36,y:n.y-h/2};case'top-out':return{x:n.x-w/2+w*.58,y:n.y-h/2};case'bottom-in':return{x:n.x-w/2+w*.32,y:n.y+h/2};case'bottom-out':return{x:n.x-w/2+w*.54,y:n.y+h/2};default:return{x:n.x+w/2,y:n.y};} }
+function tangentFor(pos){ if(pos==='left')return{x:-1,y:0}; if(pos==='right')return{x:1,y:0}; if(pos&&pos.startsWith('top'))return{x:0,y:-1}; if(pos&&pos.startsWith('bottom'))return{x:0,y:1}; return{x:1,y:0}; }
+function defaultMid(s,e,sp,tp){ const ta=tangentFor(sp),tb=tangentFor(tp); const mx=(s.x+e.x)/2,my=(s.y+e.y)/2; const dist=Math.hypot(e.x-s.x,e.y-s.y); return{x:mx+(ta.x-tb.x)*Math.min(160,dist*.22),y:my+(ta.y-tb.y)*Math.min(160,dist*.22)}; }
+function edgePoints(e){ const a=byId(e.from),b=byId(e.to); if(!a||!b)return null; const sp=e.fromPos||'right',tp=e.toPos||'left'; const start=portPos(a,sp),end=portPos(b,tp); let mid; if(e.mx!=null&&e.my!=null)mid={x:Number(e.mx),y:Number(e.my)}; else if(e.cx!=null)mid={x:(start.x+2*Number(e.cx)+end.x)/4,y:(start.y+2*Number(e.cy)+end.y)/4}; else mid=defaultMid(start,end,sp,tp); const c={x:2*mid.x-start.x/2-end.x/2,y:2*mid.y-start.y/2-end.y/2}; return{start,end,mid,c}; }
+function qPath(p){ return`M ${p.start.x} ${p.start.y} Q ${p.c.x} ${p.c.y} ${p.end.x} ${p.end.y}`; }
+function edgeLabelText(e){ const f=byId(e.from),t=byId(e.to); const type=Number(e.fixed)>0?'FIX':((Number(e.pct)||0)+'%'); return`${f?.name||'Node'} → ${t?.name||'Node'}  ·  ${type}  ·  ${money(metrics.edge[e.id]||0)}`; }
+function draw(){ svg.innerHTML=''; const defs=document.createElementNS('http://www.w3.org/2000/svg','defs'); svg.appendChild(defs); for(const e of edges){ const f=byId(e.from),t=byId(e.to),pts=edgePoints(e); if(!f||!t||!pts)continue; const col=colors[f.type]||colors.custom; const isSel=selectedEdge===e.id; const marker=document.createElementNS('http://www.w3.org/2000/svg','marker'); const mid='arr-'+e.id; marker.setAttribute('id',mid); marker.setAttribute('viewBox','0 0 8 8'); marker.setAttribute('refX','6'); marker.setAttribute('refY','4'); marker.setAttribute('markerWidth','5'); marker.setAttribute('markerHeight','5'); marker.setAttribute('orient','auto'); marker.innerHTML=`<path d="M1 1L7 4L1 7" fill="none" stroke="${col}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`; defs.appendChild(marker); const hit=document.createElementNS('http://www.w3.org/2000/svg','path'); hit.setAttribute('d',qPath(pts)); hit.setAttribute('class','edge-hit'); hit.setAttribute('fill','none'); hit.setAttribute('stroke','transparent'); hit.setAttribute('stroke-width','22'); hit.dataset.edge=e.id; svg.appendChild(hit); const p=document.createElementNS('http://www.w3.org/2000/svg','path'); p.setAttribute('d',qPath(pts)); p.setAttribute('class','edge-main'); p.setAttribute('fill','none'); p.setAttribute('stroke',col); p.setAttribute('stroke-width',isSel?'3':'2'); p.setAttribute('stroke-opacity',isSel?'.9':'.5'); p.setAttribute('stroke-dasharray','7 5'); p.setAttribute('marker-end',`url(#${mid})`); p.innerHTML='<animate attributeName="stroke-dashoffset" from="0" to="-96" dur="2.6s" repeatCount="indefinite"/>'; svg.appendChild(p); if(isSel){ const glow=document.createElementNS('http://www.w3.org/2000/svg','path'); glow.setAttribute('d',qPath(pts)); glow.setAttribute('fill','none'); glow.setAttribute('stroke',col); glow.setAttribute('stroke-width','8'); glow.setAttribute('stroke-opacity','.12'); svg.insertBefore(glow,p); } const handle=document.createElementNS('http://www.w3.org/2000/svg','circle'); handle.setAttribute('cx',pts.mid.x); handle.setAttribute('cy',pts.mid.y); handle.setAttribute('r',isSel?'7':'5'); handle.setAttribute('class','edge-handle'); handle.setAttribute('fill',col); handle.setAttribute('fill-opacity',isSel?'.85':'.45'); handle.setAttribute('stroke','#050710'); handle.setAttribute('stroke-width','2'); handle.dataset.edge=e.id; svg.appendChild(handle); const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','edge-label'); g.dataset.edge=e.id; const text=edgeLabelText(e); const tw=Math.min(340,Math.max(120,text.length*6)); const lx=pts.mid.x,ly=pts.mid.y-20; const r=document.createElementNS('http://www.w3.org/2000/svg','rect'); r.setAttribute('x',lx-tw/2); r.setAttribute('y',ly-13); r.setAttribute('width',tw); r.setAttribute('height','26'); r.setAttribute('rx','13'); r.setAttribute('fill','rgba(5,7,15,.92)'); r.setAttribute('stroke',col); r.setAttribute('stroke-opacity',isSel?'.85':'.42'); const tx=document.createElementNS('http://www.w3.org/2000/svg','text'); tx.setAttribute('x',lx); tx.setAttribute('y',ly+4); tx.setAttribute('text-anchor','middle'); tx.setAttribute('font-size','9'); tx.setAttribute('font-family','DM Mono, monospace'); tx.setAttribute('font-weight','500'); tx.setAttribute('fill',col); tx.setAttribute('fill-opacity','.88'); tx.textContent=text.length>52?text.slice(0,49)+'…':text; g.append(r,tx); svg.appendChild(g); } if(connecting){ const a=byId(connecting.from); if(a){ const start=portPos(a,connecting.fromPos); const end=s2w(connecting.x,connecting.y); const mid=defaultMid(start,end,connecting.fromPos,'left'); const c={x:2*mid.x-start.x/2-end.x/2,y:2*mid.y-start.y/2-end.y/2}; const p=document.createElementNS('http://www.w3.org/2000/svg','path'); p.setAttribute('d',`M ${start.x} ${start.y} Q ${c.x} ${c.y} ${end.x} ${end.y}`); p.setAttribute('fill','none'); p.setAttribute('stroke',colors[a.type]||colors.custom); p.setAttribute('stroke-width','2.4'); p.setAttribute('stroke-opacity','.75'); p.setAttribute('stroke-dasharray','7 5'); svg.appendChild(p); } } }
+function nodeDown(e){ const port=e.target.closest('.port'); if(port){ if(port.dataset.port==='out'){ e.stopPropagation(); connecting={from:port.dataset.node,fromPos:port.dataset.pos,x:e.clientX,y:e.clientY}; draw(); } return; } const n=byId(this.id.replace('node-','')); if(!n)return; e.stopPropagation(); const p=s2w(e.clientX,e.clientY); drag={id:n.id,dx:p.x-n.x,dy:p.y-n.y}; selected=n.id; selectedEdge=null; this.classList.add('dragging'); this.setPointerCapture?.(e.pointerId); renderAll(); }
+function nodeClick(e){ if(e.target.closest('.port'))return; e.stopPropagation(); openPanel(this.id.replace('node-','')); }
+VP.addEventListener('pointerdown',e=>{ const eh=e.target.closest?.('.edge-handle,.edge-label,.edge-hit'); if(eh){ e.stopPropagation(); const id=eh.dataset.edge; selectedEdge=id; selected=null; const ed=edgeById(id); if(eh.classList.contains('edge-handle')||eh.classList.contains('edge-label')){ const pts=edgePoints(ed),p=s2w(e.clientX,e.clientY); edgeDrag={id,dx:p.x-(pts?.mid.x||0),dy:p.y-(pts?.mid.y||0)}; eh.classList.add('dragging'); }else{ openEdgeExisting(id,e.clientX,e.clientY); } draw(); return; } if(e.target!==VP&&e.target!==world&&e.target!==nodesEl)return; pan={x:e.clientX,y:e.clientY,ox:view.x,oy:view.y}; VP.classList.add('panning'); selected=null; selectedEdge=null; $('panel').classList.remove('show'); updateSummaryVisibility(); renderAll(); });
+window.addEventListener('pointermove',e=>{ if(drag){ const n=byId(drag.id); if(n){ const p=s2w(e.clientX,e.clientY); n.x=p.x-drag.dx; n.y=p.y-drag.dy; renderNode(n); draw(); } }else if(edgeDrag){ const ed=edgeById(edgeDrag.id); if(ed){ const p=s2w(e.clientX,e.clientY); ed.mx=p.x-edgeDrag.dx; ed.my=p.y-edgeDrag.dy; delete ed.cx; delete ed.cy; draw(); } }else if(connecting){ connecting.x=e.clientX; connecting.y=e.clientY; document.querySelectorAll('.port.hot').forEach(x=>x.classList.remove('hot')); const t=document.elementFromPoint(e.clientX,e.clientY); const port=t?.closest?.('.port.in'); if(port&&port.dataset.node!==connecting.from)port.classList.add('hot'); draw(); }else if(pan){ view.x=pan.ox+e.clientX-pan.x; view.y=pan.oy+e.clientY-pan.y; applyView(); draw(); } });
+window.addEventListener('pointerup',e=>{ if(drag){ const el=$('node-'+drag.id); if(el){ el.classList.remove('dragging'); el.classList.add('jiggle'); setTimeout(()=>el.classList.remove('jiggle'),360); } drag=null; save(); renderAll(); } if(edgeDrag){ edgeDrag=null; save(); draw(); } if(connecting){ document.querySelectorAll('.port.hot').forEach(x=>x.classList.remove('hot')); const target=document.elementFromPoint(e.clientX,e.clientY); const port=target?.closest?.('.port.in'); if(port&&port.dataset.node!==connecting.from)openEdgeNew(connecting.from,port.dataset.node,connecting.fromPos,port.dataset.pos,e.clientX,e.clientY); connecting=null; draw(); } if(pan){ pan=null; VP.classList.remove('panning'); save(); } });
+VP.addEventListener('wheel',e=>{ e.preventDefault(); const before=s2w(e.clientX,e.clientY); view.scale=Math.max(.16,Math.min(2.8,view.scale*(e.deltaY<0?1.08:.925))); view.x=e.clientX-before.x*view.scale; view.y=e.clientY-before.y*view.scale; applyView(); draw(); save(); },{passive:false});
+function updateSummaryVisibility(){ const isOpen=$('panel').classList.contains('show'); $('summary').classList.toggle('panel-open',isOpen); }
+function openPanel(id){ selected=id; selectedEdge=null; const n=byId(id); if(!n)return; $('panelTitle').textContent=n.name; $('nodeName').value=n.name; $('nodeSub').value=n.sub||''; $('nodeBase').value=n.base||0; $('nodeProfit').value=''; $('deleteBtn').style.display=n.type==='cf'?'none':'block'; $('panel').classList.add('show'); updateSummaryVisibility(); renderAll(); updateProfitPreview(); }
+function saveNode(){ const n=byId(selected); if(!n)return; n.name=$('nodeName').value||n.name; n.sub=$('nodeSub').value||''; n.base=Math.max(0,Number($('nodeBase').value)||0); recalc(); save(); openPanel(n.id); }
+function deleteNode(){ const n=byId(selected); if(!n||n.type==='cf')return; const el=$('node-'+n.id); if(el)el.remove(); nodes=nodes.filter(x=>x.id!==n.id); edges=edges.filter(e=>e.from!==n.id&&e.to!==n.id); selected=null; $('panel').classList.remove('show'); updateSummaryVisibility(); recalc(); save(); }
+function getProfitDistribution(nodeId,profit){ const amount=Math.max(0,Number(profit)||0); const outs=edges.filter(e=>e.from===nodeId&&byId(e.to)); if(amount<=0)return{items:outs.map(e=>({...e,amount:0,raw:0,scaled:false})),total:0,remain:Number(profit)||0,scale:1}; let rawTotal=0; const list=outs.map(e=>{ const raw=Math.max(0,Number(e.fixed)>0?Number(e.fixed):amount*(Number(e.pct)||0)/100); rawTotal+=raw; return{...e,raw}; }); const scale=rawTotal>amount&&rawTotal>0?amount/rawTotal:1; let total=0; const items=list.map(e=>{ const a=e.raw*scale; total+=a; return{...e,amount:a,scaled:scale<1}; }); return{items,total,remain:amount-total,scale}; }
+function clearOutgoingLast(nodeId){ for(const e of edges.filter(e=>e.from===nodeId)){ e.lastAmount=0; e.lastAt=new Date().toISOString(); } }
+function deliverAmount(nodeId,amount,path=[]){ const n=byId(nodeId); const incoming=Math.max(0,Number(amount)||0); if(!n||incoming<=0)return; if(path.includes(nodeId)||path.length>14){ n.base=Math.max(0,(Number(n.base)||0)+incoming); return; } const d=getProfitDistribution(nodeId,incoming); clearOutgoingLast(nodeId); for(const it of d.items){ const e=edgeById(it.id); if(!e)continue; e.lastAmount=it.amount; e.lastAt=new Date().toISOString(); if(it.amount>0)deliverAmount(it.to,it.amount,path.concat(nodeId)); } n.base=Math.max(0,(Number(n.base)||0)+d.remain); }
+function updateProfitPreview(){ const box=$('profitPreview'); const n=byId(selected); if(!box||!n)return; const base=Math.max(0,Number($('nodeBase').value)||0); const profit=Number($('nodeProfit').value)||0; const d=getProfitDistribution(n.id,profit); let html=`Balance ตอนนี้: <b>${money(base)}</b><br>P&L รอบนี้: <b style="color:${profit>=0?'#00e5b4':'#ff4268'}">${money(profit)}</b><br>`; if(profit>0){ if(!d.items.length)html+='ไม่มีเส้นออก → กำไรทั้งหมดเข้า balance<br>'; for(const it of d.items){ const to=byId(it.to); html+=`→ ${to?to.name:'Node'}: <b>${money(it.amount)}</b> <span class="pill">${Number(it.fixed)>0?'FIX '+(Number(it.fixed)):((Number(it.pct)||0)+'%')}</span><br>`; } if(d.scale<1)html+=`<span style="color:#f7b731">⚠ ยอดเกิน — ลดตามสัดส่วน auto</span><br>`; html+=`คงเหลือเข้า balance: <b>${money(d.remain)}</b><br>Balance หลังบันทึก: <b>${money(base+d.remain)}</b>`; }else if(profit<0){ html+=`ขาดทุน → ไม่โอนออก<br>Balance หลังบันทึก: <b>${money(Math.max(0,base+profit))}</b>`; }else{ html+=`ยังไม่ใส่ P&L<br>Balance หลังบันทึก: <b>${money(base)}</b>`; } box.innerHTML=html; }
+function applyProfitCycle(){ const n=byId(selected); if(!n)return; n.name=$('nodeName').value||n.name; n.sub=$('nodeSub').value||''; const base=Math.max(0,Number($('nodeBase').value)||0); const profit=Number($('nodeProfit').value)||0; n.base=base; clearOutgoingLast(n.id); if(profit>0){ const d=getProfitDistribution(n.id,profit); for(const it of d.items){ const e=edgeById(it.id); if(!e)continue; e.lastAmount=it.amount; e.lastAt=new Date().toISOString(); if(it.amount>0)deliverAmount(it.to,it.amount,[n.id]); } n.base=Math.max(0,base+d.remain); }else if(profit<0){ n.base=Math.max(0,base+profit); } $('nodeProfit').value=''; recalc(); save(); openPanel(n.id); }
+function edgeList(){ const box=$('edgeList'); box.innerHTML=''; if(!selected)return; edges.filter(e=>e.from===selected||e.to===selected).forEach(e=>{ const f=byId(e.from),t=byId(e.to); if(!f||!t)return; const div=document.createElement('div'); div.className='edgeitem'; div.dataset.edge=e.id; const txt=e.from===selected?`OUT → ${t.name}`:`IN ← ${f.name}`; div.innerHTML=`<button data-remove="${e.id}">✕</button>${txt}<br>กติกา: ${Number(e.fixed)>0?'FIX '+money(e.fixed):(Number(e.pct)||0)+'% ของกำไร'}<br>ส่งล่าสุด: ${money(metrics.edge[e.id]||0)}`; box.appendChild(div); }); }
+function fillEdgeModal(e,isExisting){ const f=byId(e.from),t=byId(e.to); $('edgeTitle').textContent=isExisting?'แก้ไขเส้น':'ตั้งค่าเส้นใหม่'; $('edgeRoute').innerHTML=`${f?f.name:'Node'} <span class="pill">${e.fromPos||'out'}</span> → ${t?t.name:'Node'} <span class="pill">${e.toPos||'in'}</span>`; $('edgePct').value=e.pct??''; $('edgeFixed').value=e.fixed??''; const mF=metrics.by[e.from]||{},mT=metrics.by[e.to]||{}; $('edgeDetails').style.display=isExisting?'block':'none'; $('edgeDetails').innerHTML=isExisting?`จาก: ${f?.name||'-'}<br>ไป: ${t?.name||'-'}<br>ส่งล่าสุด: <b>${money(metrics.edge[e.id]||0)}</b><br>กติกา: ${Number(e.fixed)>0?'FIX '+money(e.fixed):(Number(e.pct)||0)+'% ของกำไร'}<br>ต้นทาง balance: ${money(mF.net||0)}<br>ปลายทาง balance: ${money(mT.net||0)}`:''; $('deleteEdgeBtn').style.display=isExisting?'block':'none'; }
+function showModalAt(sx,sy){ const m=$('edgeModal'); m.style.left=Math.min(innerWidth-330,Math.max(12,sx+12))+'px'; m.style.top=Math.min(innerHeight-300,Math.max(12,sy-50))+'px'; $('backdrop').classList.add('show'); m.classList.add('show'); setTimeout(()=>$('edgePct').focus(),0); }
+function openEdgeNew(from,to,fromPos,toPos,sx,sy){ const old=edges.find(e=>e.from===from&&e.to===to&&e.fromPos===fromPos&&e.toPos===toPos); pendingEdge=old?{mode:'edit',id:old.id}:{mode:'new',from,to,fromPos,toPos}; fillEdgeModal(old||{from,to,fromPos,toPos,pct:'',fixed:''},!!old); showModalAt(sx,sy); }
+function openEdgeExisting(id,sx,sy){ const e=edgeById(id); if(!e)return; selectedEdge=id; pendingEdge={mode:'edit',id}; fillEdgeModal(e,true); showModalAt(sx,sy); draw(); }
+function closeEdge(){ pendingEdge=null; $('backdrop').classList.remove('show'); $('edgeModal').classList.remove('show'); }
+function saveEdge(){ if(!pendingEdge)return; const pct=Number($('edgePct').value)||0,fixed=Number($('edgeFixed').value)||0; if(pendingEdge.mode==='edit'){ const e=edgeById(pendingEdge.id); if(e){ e.pct=pct; e.fixed=fixed; selectedEdge=e.id; } }else{ if(pendingEdge.from===pendingEdge.to){ closeEdge(); return; } const s=portPos(byId(pendingEdge.from),pendingEdge.fromPos),en=portPos(byId(pendingEdge.to),pendingEdge.toPos); edges.push({id:uid('e'),from:pendingEdge.from,to:pendingEdge.to,fromPos:pendingEdge.fromPos,toPos:pendingEdge.toPos,pct,fixed,lastAmount:0,mx:(s.x+en.x)/2,my:(s.y+en.y)/2}); selectedEdge=edges[edges.length-1].id; } closeEdge(); recalc(); save(); }
+function deleteEdge(id){ const target=id||(pendingEdge&&pendingEdge.id); if(!target)return; edges=edges.filter(e=>e.id!==target); selectedEdge=null; closeEdge(); recalc(); save(); }
+function updateSummary(){ const box=$('summary'); if(!box)return; const cf=nodes.find(n=>n.type==='cf'); const totalBase=nodes.reduce((s,n)=>s+(Number(n.base)||0),0); const typeTotal={}; for(const n of nodes){ typeTotal[n.type]=(typeTotal[n.type]||0)+(Number(n.base)||0); } let topNode=null,topAmt=0; for(const n of nodes){ const m=metrics.by[n.id]; if(!m)continue; if(m.in>topAmt){ topAmt=m.in; topNode=n; } } const now=new Date(); const timeStr=now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}); box.innerHTML=`<div class="sum-title">Treasury Overview</div><div class="sum-row"><span class="sum-label">Total Balance</span><span class="sum-val gold">${money(totalBase)}</span></div><div class="sum-row"><span class="sum-label">CF กลาง</span><span class="sum-val gold">${money(cf?cf.base:0)}</span></div><hr class="sum-divider"><div class="sum-row"><span class="sum-label">Beta รวม</span><span class="sum-val green">${money(typeTotal['beta']||0)}</span></div><div class="sum-row"><span class="sum-label">Alpha รวม</span><span class="sum-val red">${money(typeTotal['alpha']||0)}</span></div><div class="sum-row"><span class="sum-label">EF รวม</span><span class="sum-val purple">${money(typeTotal['ef']||0)}</span></div><hr class="sum-divider"><div class="sum-row"><span class="sum-label">เข้า CF รอบล่าสุด</span><span class="sum-val green">${money(metrics.cfIn)}</span></div><div class="sum-row"><span class="sum-label">ออก CF รอบล่าสุด</span><span class="sum-val">${money(metrics.cfOut)}</span></div>${topNode?`<div class="sum-row"><span class="sum-label">รับมากสุด</span><span class="sum-val" style="color:${colors[topNode.type]||colors.custom}">${topNode.name}</span></div>`:''}<hr class="sum-divider"><div class="sum-meta">Nodes: ${nodes.length} &nbsp;·&nbsp; Lines: ${edges.length}<br>Zoom: ${Math.round(view.scale*100)}%<br>Updated: ${timeStr}</div>`; }
+function fit(){ if(!nodes.length)return; let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity; nodes.forEach(n=>{ minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x); maxY=Math.max(maxY,n.y); }); const w=maxX-minX+560,h=maxY-minY+430; view.scale=Math.min(1.15,Math.max(.22,Math.min(innerWidth/w,innerHeight/h))); view.x=innerWidth/2-((minX+maxX)/2)*view.scale; view.y=innerHeight/2-((minY+maxY)/2)*view.scale; applyView(); draw(); save(); }
+function reset(){ localStorage.removeItem(STORAGE_KEY); nodes=[]; edges=[]; selected=null; selectedEdge=null; nodesEl.innerHTML=''; view={x:innerWidth/2,y:innerHeight/2,scale:1}; applyView(); const cf=addNode('cf',0,0,'CF กลาง','เงินสดหมุนเวียน',0); const b1=addNode('beta',-360,-145,'Beta #1','SGOV / JEPA',3000); const b2=addNode('beta',-370,140,'Beta #2','ทอง / สินค้า',5000); const a1=addNode('alpha',370,-145,'Alpha #1','Forex',10000); const a2=addNode('alpha',375,140,'Alpha #2','Prop Firm',0); const ef=addNode('ef',0,-310,'Emergency Fund','เป้า 30K',3000); edges=[{id:uid('e'),from:b1.id,to:cf.id,fromPos:'right',toPos:'top',pct:30,fixed:0,lastAmount:0,mx:-170,my:-185},{id:uid('e'),from:b2.id,to:cf.id,fromPos:'top-out',toPos:'top',pct:10,fixed:0,lastAmount:0,mx:-165,my:68},{id:uid('e'),from:a1.id,to:cf.id,fromPos:'left',toPos:'top',pct:50,fixed:0,lastAmount:0,mx:180,my:-195},{id:uid('e'),from:a1.id,to:a2.id,fromPos:'bottom-out',toPos:'top-in',pct:15,fixed:0,lastAmount:0,mx:510,my:0},{id:uid('e'),from:cf.id,to:ef.id,fromPos:'bottom',toPos:'bottom-in',pct:20,fixed:0,lastAmount:0,mx:115,my:-220}]; $('panel').classList.remove('show'); updateSummaryVisibility(); recalc(); save(); fit(); }
+$('saveBtn').addEventListener('click',saveNode);$('applyProfitBtn').addEventListener('click',applyProfitCycle);$('nodeProfit').addEventListener('input',updateProfitPreview);$('nodeBase').addEventListener('input',updateProfitPreview);$('deleteBtn').addEventListener('click',deleteNode);$('saveEdgeBtn').addEventListener('click',saveEdge);$('cancelEdgeBtn').addEventListener('click',closeEdge);$('deleteEdgeBtn').addEventListener('click',()=>deleteEdge());$('backdrop').addEventListener('pointerdown',closeEdge);$('fitBtn').addEventListener('click',fit);$('resetBtn').addEventListener('click',reset);document.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>addNode(b.dataset.add)));$('edgeList').addEventListener('click',e=>{ const rid=e.target.dataset.remove; if(rid){ e.stopPropagation(); deleteEdge(rid); return; } const item=e.target.closest('.edgeitem'); if(item)openEdgeExisting(item.dataset.edge,innerWidth-350,innerHeight/2); });window.addEventListener('resize',()=>{ applyView(); draw(); });
+applyView();if(!load())reset();
+})();
+</script>
+<!--
+  NOTION EMBED — วิธีให้ข้อมูลไม่รีเซ็ท
+  ปัญหา: Notion iframe = origin ต่างกันทุกครั้ง → localStorage isolate ใหม่ทุกครั้ง
+  วิธีแก้:
+  1. อัปโหลด HTML นี้ขึ้น GitHub Pages → URL คงที่ เช่น username.github.io/capital-flow
+  2. ใน Notion ใช้ /embed แล้ววาง URL นั้น
+  3. domain คงที่ = localStorage คงที่ = ข้อมูลอยู่
+  Key ที่ใช้เก็บ: cfNetwork.cashflow.profitLedger.v2
+-->
+</body>
+</html>
